@@ -51,10 +51,10 @@ weekdays_de = ['Mo','Di','Mi','Do','Fr','Sa','So']
 iban_re = regex.compile(r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b')
 MAX_INFO = 30
 TERMINAL_WIDTH = 60
+MAX_TABLE_ENTRIES = 22
 
 #========== objects ==========
-table = [22]
-table_iter = 0
+table = []
 
 time_repr = lambda seconds: f'{int(seconds//3600):0>2},{int((seconds%3600)/36):0<2}'
 
@@ -110,7 +110,8 @@ while True:
 
 while True:
     try:
-        year = int(terminal_input(f'Enter the year (press enter to default to {datetime.now().year}): ') or datetime.now().year)
+        last_year = datetime.now().year if datetime.now().month > 1 else datetime.now().year - 1 
+        year = int(terminal_input(f'Enter the year (press enter to default to {last_year}): ') or last_year)
         terminal_print(f'Year set to: {year}\n')
         break
     except ValueError:
@@ -119,7 +120,14 @@ while True:
 
 while True:
     try:
-        month = int(terminal_input(f'Enter the month (1-12) (press Enter to default to {datetime.now().month-1} ({months_de[datetime.now().month-2]})): ') or datetime.now().month-1)
+        if datetime.now().month == 1: # if it's January
+            if last_year != year: # if the user changed the year, make current month the default
+                last_month = 1
+            else:
+                last_month = 12 # else make it December of last year
+        else:
+            last_month = (datetime.now().month-1) # otherwise choose last month
+        month = int(terminal_input(f'Enter the month (1-12) (press Enter to default to {last_month} ({months_de[last_month-1]})): ') or last_month)
         terminal_print(f'Month set to: {months_de[month-1]}')
         break
     except ValueError:
@@ -130,8 +138,8 @@ terminal_print('',end_line=True)
 total_seconds = 0.0
 start_date = datetime(year,month,1)
 
-while table_iter < len(table):
-    terminal_print(f'ENTRY {table_iter+1}/22',start_line=True)
+while len(table) <= MAX_TABLE_ENTRIES:
+    terminal_print(f'ENTRY {len(table)+1}/22',start_line=True)
     # Day Input
     while True:
         try:
@@ -200,27 +208,26 @@ while table_iter < len(table):
         break
 
     # Saving the data for this entry
-    table[table_iter] = (start_date.strftime('%d.%m. ')+weekdays_de[start_date.weekday()],
+    table.append((start_date.strftime('%d.%m. ')+weekdays_de[start_date.weekday()],
                             start_date.strftime('%H:%M-')+end_date.strftime('%H:%M'),
                             f'{time_repr(delta.seconds)} hrs',
-                            info)
-    table_iter += 1
+                            info))
 
     # Inquiry for new line
     total_seconds += delta.seconds
-    new_line = False
     terminal_print("",end_line=True)
+    cancel = False
     while True:
         new_entry = input('New entry? (y/n)').strip().lower()
-        if new_entry == 'y':
+        if new_entry == 'n':
+            cancel = True
             break
-        elif new_entry == 'n':
-            new_line = True
+        elif new_entry == 'y':
             break
         else:
             print('Invalid answer.')
 
-    if new_line:
+    if cancel:
         break
 
 # writing the collected data to the image
@@ -229,9 +236,9 @@ template.text(iban_pos, iban, font=iban_font, fill=(0,0,0))
 template.text(month_pos, months_de[month-1], font=month_font, fill =(0, 0, 0))
 template.text(year_pos, str(year)[2:], font=year_font, fill =(0, 0, 0))
 
-for row in range(table_iter):
+for i, row in enumerate(table):
     for column in range(4):
-        template.text((table_xpos[column], y_start + y_delta * row), table[row][column], font=table_font, fill =(0, 0, 0))
+        template.text((table_xpos[column], y_start + y_delta * i), row[column], font=table_font, fill =(0, 0, 0))
 
 template.text(hours_pos, f'{time_repr(total_seconds)} h', font=hours_font, fill =(0, 0, 0))
 img.save(f'job_log_{start_date.month:0>2}_{str(start_date.year)[2:]}.png')
