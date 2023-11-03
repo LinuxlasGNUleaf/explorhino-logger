@@ -266,7 +266,9 @@ for i, row in enumerate(table):
         template.text((table_x_positions[column], y_start + y_delta * i), row[column], font=table_font, fill=(0, 0, 0))
 
 template.text(hours_pos, f'{time_str(total_seconds)} h', font=hours_font, fill=(0, 0, 0))
-img.save(f'job_log_{start_date.month:0>2}_{str(start_date.year)[2:]}.png')
+output_fname = f'job_log_{start_date.month:0>2}_{str(start_date.year)[2:]}'
+img.save(f'{output_fname}.png')
+os.system(f'convert -scale 1218x1848 -compress JPEG -quality 90 {output_fname}.png {output_fname}.pdf')
 
 with open(quickuse_file, 'wb') as qfile:
     pickle.dump((iban, quickuse), qfile)
