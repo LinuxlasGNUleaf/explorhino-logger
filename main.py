@@ -1,28 +1,30 @@
 import os
 import pickle
 import platform
-import regex
+import re
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
 default_name = ''
 if platform.system() == 'Linux':
     import pwd
+
     default_name = pwd.getpwuid(os.getuid()).pw_gecos.split(',')[0]
 
-#========== paths ==========
+# ========== paths ==========
 font_file = 'src/RobotoMono.ttf'
 template_file = 'src/template.png'
+empty_template_file = 'src/template_empty.png'
 quickuse_file = 'quickuse.arr'
 
-#========== fonts & positions ==========
+# ========== fonts & positions ==========
 # name field
-name_pos = (840,965)
+name_pos = (840, 965)
 name_font = ImageFont.truetype(font_file, 115)
 
 # IBAN field
-iban_pos = (1800,1280)
+iban_pos = (1800, 1280)
 iban_font = name_font
 
 # month field
@@ -35,7 +37,7 @@ year_font = ImageFont.truetype(font_file, 95)
 
 # table
 table_font = ImageFont.truetype(font_file, 118)
-table_xpos = [230,945,1805,2510]
+table_x_positions = [230, 945, 1805, 2510]
 y_start = 2650
 y_delta = 185.3
 
@@ -43,45 +45,56 @@ y_delta = 185.3
 hours_pos = (1790, 6795)
 hours_font = ImageFont.truetype(font_file, 160)
 
-#========== german localizations ==========
-months_de = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']
-weekdays_de = ['Mo','Di','Mi','Do','Fr','Sa','So']
+# ========== german localizations ==========
+months_de = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November',
+             'Dezember']
+weekdays_de = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-#========== div. configs ==========
-iban_re = regex.compile(r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b')
+# ========== div. configs ==========
+iban_re = re.compile(r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b')
 MAX_INFO = 30
 TERMINAL_WIDTH = 60
 MAX_TABLE_ENTRIES = 22
+USE_TEMPLATE = False
 
-#========== objects ==========
+# ========== objects ==========
 table = []
 
-time_repr = lambda seconds: f'{int(seconds//3600):0>2},{int((seconds%3600)/36):0<2}'
+
+def time_str(seconds):
+    return f'{int(seconds // 3600):0>2},{int((seconds % 3600) / 36):0<2}'
+
 
 if os.path.isfile(quickuse_file):
-    with open(quickuse_file,'rb') as qfile:
+    with open(quickuse_file, 'rb') as qfile:
         default_iban, quickuse = pickle.load(qfile)
 else:
-    default_iban, quickuse = '',{}
+    default_iban, quickuse = '', {}
 
-img = Image.open(template_file)
+if USE_TEMPLATE:
+    img = Image.open(template_file)
+else:
+    img = Image.open(empty_template_file)
 template = ImageDraw.Draw(img)
+
 
 def terminal_print(print_str, start_line=False, end_line=False):
     if start_line:
-        print(f'//{print_str.center(len(print_str)+2).center(TERMINAL_WIDTH,"=")}\\\\')
+        print(f'//{print_str.center(len(print_str) + 2).center(TERMINAL_WIDTH, "=")}\\\\')
         return
     elif end_line:
-        print(f'\\\\{TERMINAL_WIDTH*"="}//\n')
+        print(f'\\\\{TERMINAL_WIDTH * "="}//\n')
         return
     else:
-        for splitstr in print_str.split('\n'):
-            print(f'|| {splitstr}')
+        for line in print_str.split('\n'):
+            print(f'|| {line}')
+
 
 def terminal_input(input_str):
     return input(f'|| {input_str}')
 
-terminal_print('GENERAL INFO',start_line=True)
+
+terminal_print('GENERAL INFO', start_line=True)
 
 while True:
     if default_name:
@@ -100,7 +113,7 @@ while True:
     else:
         iban = terminal_input('Enter your IBAN : ')
     if iban:
-        if regex.search(iban_re,iban.strip()):
+        if re.search(iban_re, iban.strip()):
             terminal_print(f'IBAN set to: {iban}\n')
             break
         else:
@@ -110,40 +123,41 @@ while True:
 
 while True:
     try:
-        last_year = datetime.now().year if datetime.now().month > 1 else datetime.now().year - 1 
+        last_year = datetime.now().year if datetime.now().month > 1 else datetime.now().year - 1
         year = int(terminal_input(f'Enter the year (press enter to default to {last_year}): ') or last_year)
         terminal_print(f'Year set to: {year}\n')
         break
     except ValueError:
         terminal_print('Invalid input, must be integer.')
 
-
 while True:
     try:
-        if datetime.now().month == 1: # if it's January
-            if last_year != year: # if the user changed the year, make current month the default
+        if datetime.now().month == 1:  # if it's January
+            if last_year != year:  # if the user changed the year, make current month the default
                 last_month = 1
             else:
-                last_month = 12 # else make it December of last year
+                last_month = 12  # else make it December of last year
         else:
-            last_month = (datetime.now().month-1) # otherwise choose last month
-        month = int(terminal_input(f'Enter the month (1-12) (press Enter to default to {last_month} ({months_de[last_month-1]})): ') or last_month)
-        terminal_print(f'Month set to: {months_de[month-1]}')
+            last_month = (datetime.now().month - 1)  # otherwise choose last month
+        month = int(terminal_input(
+            f'Enter the month (1-12) (press Enter to default to {last_month} ({months_de[last_month - 1]})): ') or last_month)
+        terminal_print(f'Month set to: {months_de[month - 1]}')
         break
     except ValueError:
         terminal_print('Invalid input, must be integer.')
 
-terminal_print('',end_line=True)
+terminal_print('', end_line=True)
 
 total_seconds = 0.0
-start_date = datetime(year,month,1)
+work_time = 0
+start_date = datetime(year, month, 1)
 
 while len(table) <= MAX_TABLE_ENTRIES:
-    terminal_print(f'ENTRY {len(table)+1}/22',start_line=True)
+    terminal_print(f'ENTRY {len(table) + 1}/22', start_line=True)
     # Day Input
     while True:
         try:
-            start_date = datetime(year,month,int(terminal_input('Enter the day (1-31): ')))
+            start_date = datetime(year, month, int(terminal_input('Enter the day (1-31): ')))
             terminal_print(f'Day set to {weekdays_de[start_date.weekday()]} {start_date.strftime("%d.%m.")}\n')
             break
         except ValueError:
@@ -152,10 +166,10 @@ while len(table) <= MAX_TABLE_ENTRIES:
     # Start Time Input
     while True:
         try:
-            time = terminal_input('Enter the start time (00:00-23:59, mins are optional): ').split(':')
+            time = terminal_input('Enter the start time (00:00-23:59, minutes are optional): ').split(':')
             if len(time) == 1:
-                time.append(0)
-            start_date = start_date.replace(hour=int(time[0]),minute=int(time[1]))
+                time.append("0")
+            start_date = start_date.replace(hour=int(time[0]), minute=int(time[1]))
             break
         except (ValueError, IndexError):
             terminal_print('Invalid input, must be valid time.')
@@ -163,26 +177,37 @@ while len(table) <= MAX_TABLE_ENTRIES:
     # End Time Input
     while True:
         try:
-            time = terminal_input('Enter the end time (00:00-23:59, mins are optional): ').split(':')
+            time = terminal_input('Enter the end time (00:00-23:59, minutes are optional): ').split(':')
             if len(time) == 1:
-                time.append(0)
-            end_date = start_date.replace(hour=int(time[0]),minute=int(time[1]))
-            delta = (end_date-start_date)
+                time.append("0")
+            end_date = start_date.replace(hour=int(time[0]), minute=int(time[1]))
+            delta = (end_date - start_date)
             if delta.days != 0 or delta.seconds == 0:
                 terminal_print('End time has to be AFTER the start time at the same day.')
                 continue
-            terminal_print(f'Time delta: {time_repr(delta.seconds)} hrs\n')
+            terminal_print(f'Time delta: {time_str(delta.seconds)} hrs')
+
+            # deducting legal break time
+            work_time = delta
+            if delta.seconds/3600 > 9:
+                work_time -= timedelta(minutes=45)
+                terminal_print('Deducting 45 min legal break time, for work time is above 9 hrs.\n')
+            elif delta.seconds/3600 > 6:
+                work_time -= timedelta(minutes=30)
+                terminal_print('Deducting 30 min legal break time, for work time is above 6 hrs.\n')
+            else:
+                terminal_print('Not deducting break time, for work time is below 6 hrs.\n')
             break
         except (ValueError, IndexError):
             terminal_print('Invalid input, must be valid time.')
 
     # Job Info Input
     while True:
-        quicklist = sorted(quickuse, key=lambda x: quickuse[x],reverse=True)
-        for i, entry in enumerate(quicklist):
-            terminal_print(f'{i+1} "{entry}"')
+        quick_list = sorted(quickuse, key=lambda x: quickuse[x], reverse=True)
+        for i, entry in enumerate(quick_list):
+            terminal_print(f'{i + 1} "{entry}"')
 
-        if quicklist:
+        if quick_list:
             info = terminal_input('Enter the job info or use a number for a shortcut: ').strip()
         else:
             info = terminal_input('Enter the job info: ').strip()
@@ -191,12 +216,12 @@ while len(table) <= MAX_TABLE_ENTRIES:
             terminal_print('Job Info can not be empty.')
             continue
         if len(info) > MAX_INFO:
-            terminal_print(f'Job Info is too long, has to be shorter than {MAX_INFO+1} characters.')
+            terminal_print(f'Job Info is too long, has to be shorter than {MAX_INFO + 1} characters.')
             continue
 
         if info.isdigit():
-            if int(info) in range(1,len(quicklist)+1):
-                info = quicklist[int(info)-1]
+            if int(info) in range(1, len(quick_list) + 1):
+                info = quick_list[int(info) - 1]
             else:
                 terminal_print('Index not in quicklist!')
                 continue
@@ -208,14 +233,14 @@ while len(table) <= MAX_TABLE_ENTRIES:
         break
 
     # Saving the data for this entry
-    table.append((start_date.strftime('%d.%m. ')+weekdays_de[start_date.weekday()],
-                            start_date.strftime('%H:%M-')+end_date.strftime('%H:%M'),
-                            f'{time_repr(delta.seconds)} hrs',
-                            info))
+    table.append((start_date.strftime('%d.%m. ') + weekdays_de[start_date.weekday()],
+                  start_date.strftime('%H:%M-') + end_date.strftime('%H:%M'),
+                  f'{time_str(work_time.seconds)} hrs',
+                  info))
 
     # Inquiry for new line
-    total_seconds += delta.seconds
-    terminal_print("",end_line=True)
+    total_seconds += work_time.seconds
+    terminal_print("", end_line=True)
     cancel = False
     while True:
         new_entry = input('New entry? (y/n)').strip().lower()
@@ -231,17 +256,17 @@ while len(table) <= MAX_TABLE_ENTRIES:
         break
 
 # writing the collected data to the image
-template.text(name_pos, name, font=name_font, fill=(0,0,0))
-template.text(iban_pos, iban, font=iban_font, fill=(0,0,0))
-template.text(month_pos, months_de[month-1], font=month_font, fill =(0, 0, 0))
-template.text(year_pos, str(year)[2:], font=year_font, fill =(0, 0, 0))
+template.text(name_pos, name, font=name_font, fill=(0, 0, 0))
+template.text(iban_pos, iban, font=iban_font, fill=(0, 0, 0))
+template.text(month_pos, months_de[month - 1], font=month_font, fill=(0, 0, 0))
+template.text(year_pos, str(year)[2:], font=year_font, fill=(0, 0, 0))
 
 for i, row in enumerate(table):
     for column in range(4):
-        template.text((table_xpos[column], y_start + y_delta * i), row[column], font=table_font, fill =(0, 0, 0))
+        template.text((table_x_positions[column], y_start + y_delta * i), row[column], font=table_font, fill=(0, 0, 0))
 
-template.text(hours_pos, f'{time_repr(total_seconds)} h', font=hours_font, fill =(0, 0, 0))
+template.text(hours_pos, f'{time_str(total_seconds)} h', font=hours_font, fill=(0, 0, 0))
 img.save(f'job_log_{start_date.month:0>2}_{str(start_date.year)[2:]}.png')
 
-with open(quickuse_file,'wb') as qfile:
-    pickle.dump((iban,quickuse), qfile)
+with open(quickuse_file, 'wb') as qfile:
+    pickle.dump((iban, quickuse), qfile)
