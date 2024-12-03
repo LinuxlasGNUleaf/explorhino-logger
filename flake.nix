@@ -12,6 +12,7 @@
       deps = with pkgs; [
         #put dependencies here :)
       	python311
+	imagemagick
       ] ++ (with pkgs.python311Packages; [
 	pillow
       ]);
