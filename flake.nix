@@ -1,5 +1,5 @@
 {
-  description = "Basic Flake";
+  description = "A automated script to fill reports for Explorhino";
 
   outputs = { self, nixpkgs }:
     let
