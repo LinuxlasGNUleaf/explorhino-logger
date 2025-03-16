@@ -56,7 +56,7 @@ iban_re = re.compile(r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})
 MAX_INFO = 30
 TERMINAL_WIDTH = 60
 MAX_TABLE_ENTRIES = 22
-USE_TEMPLATE = False
+USE_TEMPLATE = True
 
 # ========== objects ==========
 table = []

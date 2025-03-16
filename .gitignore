@@ -1,3 +1,4 @@
 .vscode
 quickuse.arr
 job_log_*
+__pycache__

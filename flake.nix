@@ -11,10 +11,12 @@
 
       deps = with pkgs; [
         #put dependencies here :)
-      	python311
+      	python312
 	imagemagick
-      ] ++ (with pkgs.python311Packages; [
+	qt5Full
+      ] ++ (with pkgs.python312Packages; [
 	pillow
+	pyqt5
       ]);
 
       non-deps = with pkgs; [
@@ -22,7 +24,7 @@
       ];
 
       #put build instructions here :)
-      explorhino-logger = pkgs.python311Packages.buildPythonApplication {
+      explorhino-logger = pkgs.python312Packages.buildPythonApplication {
         name = "explorhino-logger";
         src = ./.;
         doCheck = false;
@@ -37,8 +39,13 @@
         buildInputs = deps;
         LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath deps;
       };
-      packages.${system}.default = pkgs.writeShellScriptBin "explorhino-logger" ''
+      packages.${system} = {
+      	default = pkgs.writeShellScriptBin "explorhino-logger" ''
+            ${explorhino-logger}/bin/main-gui.py "''${@:1}"
+          '';
+      	old = pkgs.writeShellScriptBin "explorhino-logger" ''
             ${explorhino-logger}/bin/main.py "''${@:1}"
           '';
+	};
     };
 }
