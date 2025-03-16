@@ -5,5 +5,5 @@ setup(
     name="explorhino-logger",
     version="1.0",
     packages=find_packages(),
-    scripts=['main.py']
+    scripts=['main.py', 'main-gui.py', 'export.py']
 )
