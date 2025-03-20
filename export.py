@@ -44,6 +44,9 @@ weekdays_de = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 def time_str(seconds):
     return f'{int(seconds // 3600):>2},{int((seconds % 3600) / 36):0<2}'
 
+def format_iban(iban):
+    iban = iban.replace(' ', '').strip().upper()
+    return ' '.join(iban[i:i+4] for i in range(0, len(iban), 4))
 
 def export_to_pdf(payload):
     # Extracting data from payload
@@ -75,7 +78,7 @@ def export_to_pdf(payload):
 
     # writing the collected data to the image
     template.text(name_pos, name, font=name_font, fill=(0, 0, 0))
-    template.text(iban_pos, iban, font=iban_font, fill=(0, 0, 0))
+    template.text(iban_pos, format_iban(iban), font=iban_font, fill=(0, 0, 0))
     template.text(month_pos, months_de[month], font=month_font, fill=(0, 0, 0))
     template.text(year_pos, str(year)[2:], font=year_font, fill=(0, 0, 0))
 

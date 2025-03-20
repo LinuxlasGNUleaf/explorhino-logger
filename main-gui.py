@@ -1,7 +1,11 @@
 #!/usr/bin/env python
+import os.path
+import pickle
 import re
 import sys
+from schwifty import IBAN
 
+from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QComboBox, QLineEdit, QLabel,
@@ -15,33 +19,30 @@ from export import export_to_pdf
 # CONFIG
 MAX_INFO = 30
 MAX_TABLE_ENTRIES = 22
-iban_re = re.compile(r'\b[A-Z]{2}[0-9]{2}(?:[ ]?[0-9]{4}){4}(?!(?:[ ]?[0-9]){3})(?:[ ]?[0-9]{1,2})?\b')
+MAX_LOCATIONS = 10
 
 
 class TimeTrackingApp(QWidget):
-    def __init__(self, default_iban="", default_name="", default_use_template=True, locations_list=None):
+    def __init__(self, config):
         super().__init__()
-        self.setWindowTitle("EXPLORHINO TIME TRACKER")
+        self.setWindowTitle("Explorhino TimeTracker")
         self.resize(950, 600)
 
-        self.default_iban = default_iban
-        self.default_name = default_name
-        self.default_use_template = default_use_template
-        self.locations_list = locations_list or ["Office", "Remote", "Client Site"]
+        self.locations_list = config['locations']
 
         self.layout = QVBoxLayout(self)
-        self.init_extra_fields()
+        self.init_extra_fields(config)
         self.init_table()
         self.add_row()  # Add an initial row
 
-    def init_extra_fields(self):
+    def init_extra_fields(self, config):
         """Initialize extra fields layout."""
         self.extra_fields_layout = QHBoxLayout()
         self.layout.addLayout(self.extra_fields_layout)
 
         # Name
         self.extra_fields_layout.addWidget(QLabel("Name:"))
-        self.name_input = QLineEdit(self.default_name)
+        self.name_input = QLineEdit(config['name'])
         self.extra_fields_layout.addWidget(self.name_input)
 
         # Month
@@ -66,20 +67,20 @@ class TimeTrackingApp(QWidget):
 
         # IBAN
         self.extra_fields_layout.addWidget(QLabel("IBAN:"))
-        self.iban_input = QLineEdit(self.default_iban)
+        self.iban_input = QLineEdit(config['iban'])
         self.iban_input.textChanged.connect(self.check_iban)
         self.extra_fields_layout.addWidget(self.iban_input)
 
         # Use PDF Template
         self.use_pdf_checkbox = QCheckBox("Use PDF Template")
-        self.use_pdf_checkbox.setChecked(self.default_use_template)
+        self.use_pdf_checkbox.setChecked(config['use_template'])
         self.extra_fields_layout.addWidget(self.use_pdf_checkbox)
 
     def init_table(self):
         """Initialize table layout."""
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Date", "From", "To", "Work Time", "Break Time", "Location", ""])
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["Date", "From", "To", "Work Time", "Break Time", "Location", None])
         self.layout.addWidget(self.table)
 
         # Buttons
@@ -136,13 +137,14 @@ class TimeTrackingApp(QWidget):
         location_combo.addItems(self.locations_list)
         location_combo.setEditable(True)
         location_combo.lineEdit().setMaxLength(MAX_INFO)
+        location_combo.lineEdit().editingFinished.connect(lambda combo=location_combo: self.update_locations(combo))
         self.table.setCellWidget(row_position, 5, location_combo)
-        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
 
         # Delete button
         delete_button = QPushButton("Delete")
         delete_button.clicked.connect(lambda _, button=delete_button: self.remove_row(button))
         self.table.setCellWidget(row_position, 6, delete_button)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
 
         # Determine if add row is greyed out
         if self.table.rowCount() >= MAX_TABLE_ENTRIES:
@@ -150,10 +152,32 @@ class TimeTrackingApp(QWidget):
         else:
             self.add_row_button.setDisabled(False)
 
+    def update_locations(self, combo):
+        location_combos = [self.table.cellWidget(row, 5) for row in range(self.table.rowCount())]
+
+        entry = combo.currentText().strip()
+        if not entry:
+            return
+
+        if entry in self.locations_list:
+            self.locations_list.remove(entry)
+        self.locations_list.insert(0, combo.currentText())
+
+        for combo_box in location_combos:
+            c_text = combo_box.lineEdit().text()
+            combo_box.clear()
+            combo_box.addItems(self.locations_list)
+            combo_box.lineEdit().setText(c_text)
+
     def update_timings(self, row):
         """Calculate and update spent time for a given row."""
-        time_from = self.table.cellWidget(row, 1).time()
-        time_to = self.table.cellWidget(row, 2).time()
+        from_widget = self.table.cellWidget(row, 1)
+        to_widget = self.table.cellWidget(row, 2)
+        time_from = from_widget.time()
+        time_to = to_widget.time()
+
+        time_from.setHMS(min(time_from.hour(), time_to.hour()), time_from.minute(), 0)
+        from_widget.setTime(time_from)
 
         from_minutes = time_from.hour() * 60 + time_from.minute()
         to_minutes = time_to.hour() * 60 + time_to.minute()
@@ -206,32 +230,24 @@ class TimeTrackingApp(QWidget):
                 date_widget.setMaximumDate(QDate(selected_year, selected_month, max_day))
 
     def check_iban(self):
-        cursor_pos = self.iban_input.cursorPosition()
-
         """Check if IBAN is valid."""
-        iban = self.iban_input.text()
-        if re.search(iban_re, iban.strip()):
+
+        iban = self.iban_input.text().strip()
+        try:
+            IBAN(self.iban_input.text().strip())
             self.iban_input.setStyleSheet("")
             self.export_button.setDisabled(False)
-        else:
+        except:
             self.iban_input.setStyleSheet("background-color: red")
             self.iban_input.setToolTip("That does not look like a valid IBAN ._. Check again.")
             self.export_button.setDisabled(True)
 
         # Remove all spaces
-        cleaned = iban.replace(" ", "").upper()
+        while " " in iban:
+            iban = iban.replace(" ", "").upper()
 
-        # Group every 4 characters
-        grouped = ' '.join(cleaned[i:i + 4] for i in range(0, len(cleaned), 4))
-
-        # Calculate new cursor position
-        diff = len(grouped) - len(iban)
-        new_cursor_pos = max(0, cursor_pos + diff)
-
-        # Block signals to avoid recursion
         self.iban_input.blockSignals(True)
-        self.iban_input.setText(grouped)
-        self.iban_input.setCursorPosition(new_cursor_pos)
+        self.iban_input.setText(iban)
         self.iban_input.blockSignals(False)
 
     def export_data(self):
@@ -258,7 +274,25 @@ class TimeTrackingApp(QWidget):
 
 
 if __name__ == "__main__":
+    if os.path.exists('entries.tmp'):
+        with open('entries.tmp', 'rb') as savefile:
+            config = pickle.load(savefile)
+    else:
+        config = {
+            'name': 'Max Mustermann',
+            'iban': '',
+            'use_template': True,
+            'locations': []
+        }
     app = QApplication(sys.argv)
-    window = TimeTrackingApp(default_iban="DE12345678901234567890", default_name="John Doe")
+    window = TimeTrackingApp(config=config)
     window.show()
-    sys.exit(app.exec_())
+    app.exec_()
+    with open('entries.tmp', 'wb') as savefile:
+        config = {
+            'name': window.name_input.text(),
+            'iban': window.iban_input.text(),
+            'use_template': window.use_pdf_checkbox.isChecked(),
+            'locations': window.locations_list[:MAX_LOCATIONS]
+        }
+        pickle.dump(config, savefile)
