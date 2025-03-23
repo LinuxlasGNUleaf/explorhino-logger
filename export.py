@@ -1,5 +1,4 @@
 import datetime
-import os
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -71,9 +70,9 @@ def export_to_pdf(payload):
                       location))
 
     if use_template:
-        img = Image.open(template_file)
+        img = Image.open(template_file).convert('RGB')
     else:
-        img = Image.open(empty_template_file)
+        img = Image.open(empty_template_file).convert('RGB')
     template = ImageDraw.Draw(img)
 
     # writing the collected data to the image
@@ -88,6 +87,6 @@ def export_to_pdf(payload):
 
     template.text(hours_pos, f'{time_str(total_seconds)} h', font=hours_font, fill=(0, 0, 0))
     output_fname = f'job_log_{month+1:0>2}_{str(year)[2:]}'
-    img.save(f'{output_fname}.png')
-    os.system(f'magick convert -scale 1218x1848 -compress JPEG -quality 90 {output_fname}.png {output_fname}.pdf')
-    os.system(f'rm {output_fname}.png')
+    img.save(f'{output_fname}.pdf', quality=50)
+    # os.system(f'magick convert -scale 1218x1848 -compress JPEG -quality 90 {output_fname}.png {output_fname}.pdf')
+    # os.system(f'rm {output_fname}.png')
