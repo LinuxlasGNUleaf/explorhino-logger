@@ -21,6 +21,9 @@ MAX_INFO = 30
 MAX_TABLE_ENTRIES = 22
 MAX_LOCATIONS = 10
 
+WARNING_COLS = lambda palette: (Qt.yellow, Qt.black)
+DEFAULT_COLS = lambda palette: (palette.color(palette.Base), palette.color(palette.Text))
+
 
 class TimeTrackingApp(QWidget):
     def __init__(self, config):
@@ -152,6 +155,8 @@ class TimeTrackingApp(QWidget):
         else:
             self.add_row_button.setDisabled(False)
 
+        self.update_timings(row_position)
+
     def update_locations(self, combo):
         location_combos = [self.table.cellWidget(row, 5) for row in range(self.table.rowCount())]
 
@@ -171,17 +176,23 @@ class TimeTrackingApp(QWidget):
 
     def update_timings(self, row):
         """Calculate and update spent time for a given row."""
+        palette = self.table.palette()
         from_widget = self.table.cellWidget(row, 1)
         to_widget = self.table.cellWidget(row, 2)
         time_from = from_widget.time()
         time_to = to_widget.time()
 
-        time_from.setHMS(min(time_from.hour(), time_to.hour()), time_from.minute(), 0)
-        from_widget.setTime(time_from)
-
         from_minutes = time_from.hour() * 60 + time_from.minute()
         to_minutes = time_to.hour() * 60 + time_to.minute()
-        work_minutes = (to_minutes - from_minutes) % (24 * 60)
+
+        work_minutes = (to_minutes - from_minutes)
+        if work_minutes <= 0:
+            self.table.item(row, 3).setBackground(WARNING_COLS(palette)[0])
+            self.table.item(row, 3).setForeground(WARNING_COLS(palette)[1])
+        else:
+            self.table.item(row, 3).setBackground(DEFAULT_COLS(palette)[0])
+            self.table.item(row, 3).setForeground(DEFAULT_COLS(palette)[1])
+        work_minutes %= (24 * 60)
 
         if work_minutes > 9 * 60:
             break_minutes = 45
@@ -194,13 +205,11 @@ class TimeTrackingApp(QWidget):
         self.table.item(row, 3).setText(f"{hours:02}:{minutes:02}")
         hours, minutes = divmod(break_minutes, 60)
         self.table.item(row, 4).setText(f"{hours:02}:{minutes:02}")
+
         if break_minutes:
-            self.table.item(row, 4).setBackground(Qt.yellow)
-            self.table.item(row, 4).setForeground(Qt.black)
+            self.table.item(row, 4).setFlags(Qt.ItemIsEnabled)
         else:
-            palette = self.table.palette()  # Get the current palette of the table
-            self.table.item(row, 4).setBackground(palette.color(palette.Base))
-            self.table.item(row, 4).setForeground(palette.color(palette.Text))
+            self.table.item(row, 4).setFlags(Qt.NoItemFlags)
 
     def remove_row(self, button):
         for row in range(self.table.rowCount()):
